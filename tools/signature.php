@@ -78,14 +78,14 @@ $csrf = getCsrfToken();
   --sb-w: 272px;
   --pv-w: 360px;
 }
-[data-theme="light"] {
-  --bg:#f1f1f5;--surface:#fff;--s2:#f7f7fb;--s3:#eeeef5;
-  --border:#e0e0ea;--border2:#d0d0de;--text:#0d0d14;--muted:#6b6b80;--dim:#b8b8cc;
-}
 :root {
   --bg:#080809;--surface:#0f0f11;--s2:#17171a;--s3:#1e1e23;
   --border:#26262d;--border2:#32323c;--text:#eeeef2;--muted:#7a7a8f;--dim:#3a3a48;
   --success:#34d399;--error:#f87171;
+}
+[data-theme="light"] {
+  --bg:#f1f1f5;--surface:#fff;--s2:#f7f7fb;--s3:#eeeef5;
+  --border:#e0e0ea;--border2:#d0d0de;--text:#0d0d14;--muted:#6b6b80;--dim:#b8b8cc;
 }
 
 /* ── PREVIEW PANEL ─── */

@@ -69,7 +69,7 @@ $csrf = getCsrfToken();
   --border:#26262d;--accent:#4f6ef7;
   --text:#eeeef2;--muted:#7a7a8f;--dim:#3a3a48;
   --success:#34d399;--error:#f87171;
-  --nav-w:240px;--topbar-h:58px;--sb-w:268px;--pv-w:340px;
+  --nav-w:240px;--topbar-h:58px;--sb-w:272px;--pv-w:360px;
 }
 [data-theme="light"]{--bg:#f1f1f5;--surface:#fff;--s2:#f7f7fb;--s3:#eeeef5;--border:#e0e0ea;--text:#0d0d14;--muted:#6b6b80;--dim:#b8b8cc}
 
