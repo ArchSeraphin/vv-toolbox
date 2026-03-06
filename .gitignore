@@ -1,0 +1,108 @@
+# ============================================================
+#  VV ToolBox — .gitignore
+# ============================================================
+
+# ── CONFIGURATION SENSIBLE ──────────────────────────────────
+# Ne JAMAIS versionner — contient identifiants DB + APP_SECRET
+config/db.php
+config/local.php
+.env
+.env.*
+!.env.example
+
+# ── UPLOADS & MÉDIAS UTILISATEURS ───────────────────────────
+# Images uploadées (logos, photos) stockées côté serveur
+uploads/
+storage/
+public/uploads/
+httpdocs/uploads/
+
+# ── LOGS ────────────────────────────────────────────────────
+*.log
+logs/
+error_log
+php_errors.log
+
+# ── CACHE ───────────────────────────────────────────────────
+cache/
+tmp/
+temp/
+*.cache
+
+# ── DÉPENDANCES ─────────────────────────────────────────────
+# Composer
+vendor/
+composer.lock     # garder si déploiement déterministe souhaité, sinon ignorer
+
+# Node (si build frontend un jour)
+node_modules/
+package-lock.json
+yarn.lock
+.pnp.*
+.yarn/
+
+# ── BUILD / DIST ─────────────────────────────────────────────
+dist/
+build/
+.parcel-cache/
+
+# ── ÉDITEURS & IDEs ─────────────────────────────────────────
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
+.history/
+
+# ── MACOS ────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverrideIcon
+Icon
+._*
+.Spotlight-V100
+.Trashes
+
+# ── WINDOWS ──────────────────────────────────────────────────
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ── LINUX ────────────────────────────────────────────────────
+*~
+.fuse_hidden*
+.nfs*
+
+# ── PHP ──────────────────────────────────────────────────────
+*.phar
+
+# ── SÉCURITÉ — fichiers à ne jamais exposer ─────────────────
+*.key
+*.pem
+*.p12
+*.crt
+*.cer
+auth_tokens.txt
+secrets.txt
+
+# ── FICHIERS PLESK / HÉBERGEUR ───────────────────────────────
+.htaccess.bak
+web.config.bak
+error_docs/
+backup/
+*.bak
+*.old
+*.orig
+*.swp
+*.swo
+
+# ── INSTALL — garder le SQL de référence, pas les données ────
+# install/setup.sql est versionné (schéma de référence)
+# À NE PAS ignorer : install/setup.sql
+
+# ── TESTS ────────────────────────────────────────────────────
+/tests/output/
+/tests/coverage/
+.phpunit.result.cache
+phpunit.xml.bak

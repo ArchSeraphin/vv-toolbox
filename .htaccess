@@ -1,0 +1,68 @@
+# VV ToolBox — Configuration Apache / Plesk
+# À placer à la racine /httpdocs/
+
+Options -Indexes
+ServerSignature Off
+
+# ── REDIRECTIONS ──────────────────────────────────────────
+RewriteEngine On
+
+# HTTPS forcé
+RewriteCond %{HTTPS} off
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# www → non-www (adapter selon votre domaine)
+# RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
+# RewriteRule ^ https://%1%{REQUEST_URI} [L,R=301]
+
+# ── ROUTES COURTES QR & CARTES ───────────────────────────
+# /r/{slug} → r.php?s={slug}
+RewriteRule ^r/([a-z0-9\-]+)$ r.php?s=$1 [L,QSA]
+# /c/{slug} → c.php?s={slug}
+RewriteRule ^c/([a-z0-9\-]+)$ c.php?s=$1 [L,QSA]
+
+# ── PROTECTION DOSSIERS SENSIBLES ─────────────────────────
+# Bloquer accès direct au dossier config
+RewriteRule ^config/ - [F,L]
+# Bloquer accès direct au dossier auth
+RewriteRule ^auth/ - [F,L]
+# Bloquer accès direct au dossier install
+RewriteRule ^install/ - [F,L]
+
+# ── HEADERS DE SÉCURITÉ ───────────────────────────────────
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "geolocation=(), camera=(), microphone=()"
+    # HSTS — activer seulement quand HTTPS est stable
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+</IfModule>
+
+# ── CACHE ASSETS ──────────────────────────────────────────
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+    ExpiresByType image/webp "access plus 1 year"
+    ExpiresByType font/woff2 "access plus 1 year"
+</IfModule>
+
+# ── COMPRESSION GZIP ──────────────────────────────────────
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css application/javascript text/plain
+</IfModule>
+
+# ── PROTECTION FICHIERS SENSIBLES ─────────────────────────
+<FilesMatch "\.(sql|log|env|git|md)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# ── PAGE D'ERREUR PERSONNALISÉE ───────────────────────────
+ErrorDocument 403 /index.php
+ErrorDocument 404 /index.php
