@@ -184,7 +184,7 @@ body.nav-mini .tb-logo-text { opacity: 0; max-width: 0; }
 body.nav-mini .nav-label { opacity: 0; height: 0; margin: 0; }
 body.nav-mini .nav-item-label { opacity: 0; max-width: 0; }
 body.nav-mini .nav-badge { opacity: 0; max-width: 0; overflow: hidden; padding: 0; margin: 0; }
-body.nav-mini .nav-item { justify-content: center; padding: 10px; }
+body.nav-mini .nav-item { padding: 10px; }
 body.nav-mini .nav-toggle-label { opacity: 0; max-width: 0; }
 
 /* ── SIDEBAR LISTE ──────────────────────────────────────── */
