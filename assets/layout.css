@@ -63,7 +63,7 @@ body {
 .tb-logo {
   width: var(--nav-w);
   display: flex; align-items: center; gap: 11px;
-  padding: 0 14px;
+  padding: 0 10px;
   border-right: 1px solid var(--border);
   height: 100%; flex-shrink: 0;
   text-decoration: none; color: var(--text);
