@@ -24,7 +24,15 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
 }
 $sql=$isAdm?'SELECT * FROM vcards ORDER BY updated_at DESC':'SELECT * FROM vcards WHERE user_id=? ORDER BY updated_at DESC';
 $st=$db->prepare($sql);if(!$isAdm)$st->execute([$uid]);else $st->execute();
-$vcList=$st->fetchAll();$csrf=getCsrfToken();
+$vcList=$st->fetchAll();
+function navCount(PDO $db, string $t, bool $adm, int $uid): int {
+    $s=$db->prepare($adm?"SELECT COUNT(*) FROM $t":"SELECT COUNT(*) FROM $t WHERE user_id=?");
+    $adm?$s->execute():$s->execute([$uid]); return (int)$s->fetchColumn();
+}
+$navQr  = navCount($db,'qr_codes',$isAdm,$uid);
+$navSig = navCount($db,'email_signatures',$isAdm,$uid);
+$navVc  = count($vcList);
+$csrf=getCsrfToken();
 ?>
 <!DOCTYPE html>
 <html lang="fr" data-theme="dark">
@@ -105,9 +113,9 @@ $vcList=$st->fetchAll();$csrf=getCsrfToken();
       </div>
       <div class="nav-section">
         <div class="nav-label">Outils</div>
-        <a class="nav-item" href="/tools/qr.php"><i class="fa fa-qrcode"></i><span class="nav-item-label"> QR Code</span><span class="nav-tip">QR Code</span></a>
-        <a class="nav-item" href="/tools/signature.php"><i class="fa fa-envelope"></i><span class="nav-item-label"> Signature mail</span><span class="nav-tip">Signature mail</span></a>
-        <a class="nav-item active" href="/tools/vcard.php"><i class="fa fa-id-card"></i><span class="nav-item-label"> Carte de visite</span><span class="nav-tip">Carte de visite</span></a>
+        <a class="nav-item" href="/tools/qr.php"><i class="fa fa-qrcode"></i><span class="nav-item-label"> QR Code</span><span class="nav-badge"><?=$navQr?></span><span class="nav-tip">QR Code</span></a>
+        <a class="nav-item" href="/tools/signature.php"><i class="fa fa-envelope"></i><span class="nav-item-label"> Signature mail</span><span class="nav-badge"><?=$navSig?></span><span class="nav-tip">Signature mail</span></a>
+        <a class="nav-item active" href="/tools/vcard.php"><i class="fa fa-id-card"></i><span class="nav-item-label"> Carte de visite</span><span class="nav-badge"><?=$navVc?></span><span class="nav-tip">Carte de visite</span></a>
       </div>
       <div class="nav-sep"></div>
       <?php if($isAdm):?><a class="nav-item" href="/admin/users.php"><i class="fa fa-users"></i><span class="nav-item-label"> Membres</span><span class="nav-tip">Membres</span></a><?php endif;?>

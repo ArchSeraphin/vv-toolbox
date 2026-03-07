@@ -55,7 +55,13 @@ $sql = $isAdm
 $st = $db->prepare($sql);
 if (!$isAdm) $st->execute([$uid]); else $st->execute();
 $sigList = $st->fetchAll();
-
+function navCount(PDO $db, string $t, bool $adm, int $uid): int {
+    $s=$db->prepare($adm?"SELECT COUNT(*) FROM $t":"SELECT COUNT(*) FROM $t WHERE user_id=?");
+    $adm?$s->execute():$s->execute([$uid]); return (int)$s->fetchColumn();
+}
+$navQr  = navCount($db,'qr_codes',$isAdm,$uid);
+$navSig = count($sigList);
+$navVc  = navCount($db,'vcards',$isAdm,$uid);
 $csrf = getCsrfToken();
 ?>
 <!DOCTYPE html>
@@ -181,9 +187,9 @@ $csrf = getCsrfToken();
       </div>
       <div class="nav-section">
         <div class="nav-label">Outils</div>
-        <a class="nav-item" href="/tools/qr.php" data-tip="QR Code"><i class="fa fa-qrcode"></i><span class="nav-item-label">QR Code</span></a>
-        <a class="nav-item active" href="/tools/signature.php" data-tip="Signature mail"><i class="fa fa-envelope"></i><span class="nav-item-label">Signature mail</span></a>
-        <a class="nav-item" href="/tools/vcard.php" data-tip="Carte de visite"><i class="fa fa-id-card"></i><span class="nav-item-label">Carte de visite</span></a>
+        <a class="nav-item" href="/tools/qr.php"><i class="fa fa-qrcode"></i><span class="nav-item-label"> QR Code</span><span class="nav-badge"><?=$navQr?></span><span class="nav-tip">QR Code</span></a>
+        <a class="nav-item active" href="/tools/signature.php"><i class="fa fa-envelope"></i><span class="nav-item-label"> Signature mail</span><span class="nav-badge"><?=$navSig?></span><span class="nav-tip">Signature mail</span></a>
+        <a class="nav-item" href="/tools/vcard.php"><i class="fa fa-id-card"></i><span class="nav-item-label"> Carte de visite</span><span class="nav-badge"><?=$navVc?></span><span class="nav-tip">Carte de visite</span></a>
       </div>
       <div class="nav-sep"></div>
       <?php if ($isAdm): ?>
