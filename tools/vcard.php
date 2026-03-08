@@ -22,8 +22,16 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     if($action==='delete'){$id=(int)($_POST['id']??0);$db->prepare('DELETE FROM vcards WHERE id=? AND user_id=?')->execute([$id,$uid]);echo json_encode(['ok'=>true]);exit;}
     echo json_encode(['ok'=>false,'error'=>'Action inconnue']);exit;
 }
-$sql=$isAdm?'SELECT * FROM vcards ORDER BY updated_at DESC':'SELECT * FROM vcards WHERE user_id=? ORDER BY updated_at DESC';
-$st=$db->prepare($sql);if(!$isAdm)$st->execute([$uid]);else $st->execute();
+$sql=$isAdm
+    ?'SELECT *, NULL AS share_permission, NULL AS shared_by FROM vcards ORDER BY updated_at DESC'
+    :'(SELECT *, NULL AS share_permission, NULL AS shared_by FROM vcards WHERE user_id=?)
+      UNION ALL
+      (SELECT v.*, s.permission AS share_permission, u_o.username AS shared_by
+       FROM vcards v
+       JOIN shares s ON s.resource_type=\'vc\' AND s.resource_id=v.id AND s.shared_with=?
+       JOIN users u_o ON u_o.id=v.user_id)
+      ORDER BY updated_at DESC';
+$st=$db->prepare($sql);if(!$isAdm)$st->execute([$uid,$uid]);else $st->execute();
 $vcList=$st->fetchAll();
 $csrf=getCsrfToken();
 
@@ -99,12 +107,23 @@ $tbActions  = '<button class="btn btn-primary btn-sm" onclick="openNewModal()"><
     <div class="sb-list" id="SBL">
       <?php if(empty($vcList)):?>
         <div class="sb-empty"><i class="fa fa-id-card"></i>Aucune carte.<br>Créez-en une.</div>
-      <?php else:foreach($vcList as $vc):$d=json_decode($vc['data_json'],true)?:[];?>
+      <?php else:foreach($vcList as $vc):
+        $d=json_decode($vc['data_json'],true)?:[];
+        $isOwner=($vc['share_permission']===null);
+      ?>
         <div class="sb-item" id="sbi-<?=$vc['id']?>" onclick="selVC(<?=$vc['id']?>)">
           <div class="sb-item-name"><?=htmlspecialchars($vc['name'])?></div>
-          <div class="sb-item-slug">/<?=htmlspecialchars($vc['slug'])?></div>
+          <div class="sb-item-slug">
+            <?php if(!$isOwner):?><span class="shared-badge"><i class="fa fa-share-nodes"></i> <?=htmlspecialchars($vc['shared_by'])?></span>
+            <?php else:?>/<?=htmlspecialchars($vc['slug'])?><?php endif;?>
+          </div>
           <div class="sb-item-dot" style="background:<?=htmlspecialchars($d['accent']??'#8b5cf6')?>"></div>
-          <div class="sb-item-actions"><button class="btn btn-ghost btn-icon btn-sm" onclick="event.stopPropagation();delVC(<?=$vc['id']?>)"><i class="fa fa-trash" style="color:var(--error)"></i></button></div>
+          <div class="sb-item-actions">
+            <?php if($isOwner):?>
+            <button class="btn btn-ghost btn-icon btn-sm" onclick="event.stopPropagation();openShare(<?=$vc['id']?>)" title="Partager"><i class="fa fa-share-nodes" style="color:var(--accent)"></i></button>
+            <button class="btn btn-ghost btn-icon btn-sm" onclick="event.stopPropagation();delVC(<?=$vc['id']?>)" title="Supprimer"><i class="fa fa-trash" style="color:var(--error)"></i></button>
+            <?php endif;?>
+          </div>
         </div>
       <?php endforeach;endif;?>
     </div>
@@ -149,13 +168,33 @@ $tbActions  = '<button class="btn btn-primary btn-sm" onclick="openNewModal()"><
   </div>
 </div>
 
+<!-- Modal: Partage vCard -->
+<div class="ov" id="MS">
+  <div class="modal" style="width:500px">
+    <h2><i class="fa fa-share-nodes" style="color:var(--accent);margin-right:8px"></i>Partager</h2>
+    <p class="modal-desc">Invitez un autre utilisateur à accéder à cette carte de visite.</p>
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <input type="email" id="shareEmail" placeholder="email@utilisateur.fr" style="flex:1;font-family:'Geist',sans-serif;font-size:13px;padding:9px 11px;background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);outline:none">
+      <select id="sharePerm" style="font-family:'Geist',sans-serif;font-size:13px;padding:9px 11px;background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);outline:none">
+        <option value="edit">Peut modifier</option>
+        <option value="view">Lecture seule</option>
+      </select>
+      <button class="btn btn-primary btn-sm" onclick="doShare()"><i class="fa fa-plus"></i></button>
+    </div>
+    <div id="shareList" style="min-height:40px"></div>
+    <div class="mf"><button class="btn btn-ghost" onclick="closeOv('MS')">Fermer</button></div>
+  </div>
+</div>
+
 <div class="toast" id="T"><i></i><span id="TM"></span></div>
 
 <script src="/assets/layout.js"></script>
 <script>
 var CSRF    = <?=json_encode($csrf)?>;
 var APP_URL = <?=json_encode(APP_URL)?>;
-var vcData  = <?=json_encode(array_map(function($v){return['id'=>(int)$v['id'],'name'=>$v['name'],'slug'=>$v['slug'],'data'=>json_decode($v['data_json'],true)?:[]];}, $vcList))?>;
+var vcData  = <?=json_encode(array_map(function($v){return['id'=>(int)$v['id'],'name'=>$v['name'],'slug'=>$v['slug'],'data'=>json_decode($v['data_json'],true)?:[],
+  'share_permission'=>$v['share_permission'],'shared_by'=>$v['shared_by']];}, $vcList))?>;
+var shareRid = 0;
 
 var cur=null, ptmr=null;
 
@@ -550,6 +589,46 @@ function createVC(){
   closeOv('MN');rED();updPV();toast('Carte créée. Personnalisez et sauvegardez.','info');
 }
 
+// ── SHARE ─────────────────────────────────────────────────────
+function openShare(id){
+  shareRid=id;
+  var sl=document.getElementById('shareList');
+  sl.innerHTML='<div style="font-size:12px;color:var(--dim);text-align:center;padding:10px">Chargement…</div>';
+  openOv('MS');
+  var fd=new FormData();fd.append('csrf_token',CSRF);fd.append('action','list');fd.append('rtype','vc');fd.append('rid',id);
+  fetch('/api/share.php',{method:'POST',body:fd,credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){
+    if(d.ok) renderShareList(d.shares);
+    else sl.innerHTML='<div style="font-size:12px;color:var(--error)">'+esc(d.error||'Erreur')+'</div>';
+  });
+}
+function renderShareList(shares){
+  var el=document.getElementById('shareList');
+  if(!shares||!shares.length){el.innerHTML='<div style="font-size:12px;color:var(--dim);text-align:center;padding:10px">Aucun partage actif</div>';return;}
+  el.innerHTML=shares.map(function(s){
+    return '<div class="share-user-row">'+
+      '<div class="share-user-av">'+esc((s.username||'?').charAt(0).toUpperCase())+'</div>'+
+      '<div class="share-user-info"><div class="share-user-name">'+esc(s.username)+'</div><div class="share-user-email">'+esc(s.email)+'</div></div>'+
+      '<span class="share-perm">'+(s.permission==='edit'?'Peut modifier':'Lecture seule')+'</span>'+
+      '<button class="btn btn-danger btn-icon btn-sm" onclick="removeShare('+s.id+')" title="Retirer"><i class="fa fa-xmark"></i></button>'+
+    '</div>';
+  }).join('');
+}
+function doShare(){
+  var email=document.getElementById('shareEmail').value.trim();
+  var perm=document.getElementById('sharePerm').value;
+  if(!email){toast('Email requis','error');return}
+  var fd=new FormData();fd.append('csrf_token',CSRF);fd.append('action','add');fd.append('rtype','vc');fd.append('rid',shareRid);fd.append('email',email);fd.append('permission',perm);
+  fetch('/api/share.php',{method:'POST',body:fd,credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){
+    if(d.ok){document.getElementById('shareEmail').value='';openShare(shareRid);toast('Partagé avec '+d.user.username,'success');}
+    else toast(d.error||'Erreur','error');
+  });
+}
+function removeShare(shareId){
+  var fd=new FormData();fd.append('csrf_token',CSRF);fd.append('action','remove');fd.append('rtype','vc');fd.append('rid',shareRid);fd.append('share_id',shareId);
+  fetch('/api/share.php',{method:'POST',body:fd,credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){
+    if(d.ok){openShare(shareRid);toast('Accès retiré.','info');}
+  });
+}
 
 </script>
 </body>

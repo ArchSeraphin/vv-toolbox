@@ -416,3 +416,15 @@ body.nav-mini .nav-toggle-label { opacity: 0; max-width: 0; }
 .share-row { display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--s2);border:1px solid var(--border);border-radius:9px;margin-bottom:6px; }
 .share-row-name { font-size:13px;font-weight:500;flex:1; }
 .share-row-role { font-size:11px;color:var(--muted); }
+
+/* Share modal – user list */
+.share-user-row  { display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--s2);border:1px solid var(--border);border-radius:9px;margin-bottom:6px; }
+.share-user-av   { width:30px;height:30px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0; }
+.share-user-info { flex:1;min-width:0; }
+.share-user-name { font-size:13px;font-weight:500; }
+.share-user-email{ font-size:11px;color:var(--muted); }
+.share-perm      { font-size:11px;color:var(--accent);background:rgba(14,165,233,.1);padding:2px 8px;border-radius:20px;flex-shrink:0; }
+
+/* Badge "Partagé par" in sidebar items */
+.shared-badge { font-size:10px;color:var(--accent);display:inline-flex;align-items:center;gap:4px; }
+.shared-badge i { font-size:9px; }

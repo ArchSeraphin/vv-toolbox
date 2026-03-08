@@ -44,10 +44,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $sql = $isAdm
-    ? 'SELECT q.*,u.username FROM qr_codes q JOIN users u ON u.id=q.user_id ORDER BY q.updated_at DESC'
-    : 'SELECT q.*,u.username FROM qr_codes q JOIN users u ON u.id=q.user_id WHERE q.user_id=? ORDER BY q.updated_at DESC';
+    ? 'SELECT q.*,u.username, NULL AS share_permission, NULL AS shared_by FROM qr_codes q JOIN users u ON u.id=q.user_id ORDER BY q.updated_at DESC'
+    : '(SELECT q.*,u.username, NULL AS share_permission, NULL AS shared_by FROM qr_codes q JOIN users u ON u.id=q.user_id WHERE q.user_id=?)
+       UNION ALL
+       (SELECT q.*,u.username, s.permission AS share_permission, u.username AS shared_by
+        FROM qr_codes q JOIN users u ON u.id=q.user_id
+        JOIN shares s ON s.resource_type=\'qr\' AND s.resource_id=q.id AND s.shared_with=?)
+       ORDER BY updated_at DESC';
 $st = $db->prepare($sql);
-if (!$isAdm) $st->execute([$uid]); else $st->execute();
+if (!$isAdm) $st->execute([$uid, $uid]); else $st->execute();
 $qrList = $st->fetchAll();
 $csrf = getCsrfToken();
 
@@ -119,13 +124,22 @@ $tbActions  = '<button class="btn btn-primary btn-sm" onclick="openNewModal()"><
     <div class="sb-list" id="SBL">
       <?php if(empty($qrList)):?>
         <div class="sb-empty"><i class="fa fa-qrcode"></i>Aucun QR code.<br>Créez-en un.</div>
-      <?php else:foreach($qrList as $qr): $opts=json_decode($qr['options_json']??'{}',true)?:[];?>
+      <?php else:foreach($qrList as $qr):
+        $opts=json_decode($qr['options_json']??'{}',true)?:[];
+        $isOwner=($qr['share_permission']===null);
+      ?>
         <div class="sb-item" id="sbi-<?=$qr['id']?>" onclick="selQR(<?=$qr['id']?>)">
           <div class="sb-item-name"><?=htmlspecialchars($qr['name'])?></div>
-          <div class="sb-item-sub"><?=htmlspecialchars(parse_url($qr['target_url'],PHP_URL_HOST)?:'')?></div>
+          <div class="sb-item-sub">
+            <?php if(!$isOwner):?><span class="shared-badge"><i class="fa fa-share-nodes"></i> <?=htmlspecialchars($qr['shared_by'])?></span>
+            <?php else:?><?=htmlspecialchars(parse_url($qr['target_url'],PHP_URL_HOST)?:'')?><?php endif;?>
+          </div>
           <div class="sb-item-dot" style="background:<?=htmlspecialchars($opts['fgColor']??'#4f6ef7')?>"></div>
           <div class="sb-item-actions">
-            <button class="btn btn-ghost btn-icon btn-sm" onclick="event.stopPropagation();delQR(<?=$qr['id']?>)"><i class="fa fa-trash" style="color:var(--error)"></i></button>
+            <?php if($isOwner):?>
+            <button class="btn btn-ghost btn-icon btn-sm" onclick="event.stopPropagation();openShare(<?=$qr['id']?>)" title="Partager"><i class="fa fa-share-nodes" style="color:var(--accent)"></i></button>
+            <button class="btn btn-ghost btn-icon btn-sm" onclick="event.stopPropagation();delQR(<?=$qr['id']?>)" title="Supprimer"><i class="fa fa-trash" style="color:var(--error)"></i></button>
+            <?php endif;?>
           </div>
         </div>
       <?php endforeach;endif;?>
@@ -177,6 +191,24 @@ $tbActions  = '<button class="btn btn-primary btn-sm" onclick="openNewModal()"><
   </div>
 </div>
 
+<!-- Modal: Partage QR -->
+<div class="ov" id="MS">
+  <div class="modal" style="width:500px">
+    <h2><i class="fa fa-share-nodes" style="color:var(--accent);margin-right:8px"></i>Partager</h2>
+    <p class="modal-desc">Invitez un autre utilisateur à accéder à ce QR Code.</p>
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <input type="email" id="shareEmail" placeholder="email@utilisateur.fr" style="flex:1;font-family:'Geist',sans-serif;font-size:13px;padding:9px 11px;background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);outline:none">
+      <select id="sharePerm" style="font-family:'Geist',sans-serif;font-size:13px;padding:9px 11px;background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);outline:none">
+        <option value="edit">Peut modifier</option>
+        <option value="view">Lecture seule</option>
+      </select>
+      <button class="btn btn-primary btn-sm" onclick="doShare()"><i class="fa fa-plus"></i></button>
+    </div>
+    <div id="shareList" style="min-height:40px"></div>
+    <div class="mf"><button class="btn btn-ghost" onclick="closeOv('MS')">Fermer</button></div>
+  </div>
+</div>
+
 <div class="toast" id="T"><i></i><span id="TM"></span></div>
 
 <script src="/assets/layout.js"></script>
@@ -186,8 +218,10 @@ var APP_URL = <?=json_encode(APP_URL)?>;
 var qrData  = <?=json_encode(array_map(function($q){
   $o=json_decode($q['options_json']??'{}',true)?:[];
   return['id'=>(int)$q['id'],'name'=>$q['name'],'slug'=>$q['slug'],
-    'target_url'=>$q['target_url'],'scan_count'=>(int)$q['scan_count'],'opts'=>$o];
+    'target_url'=>$q['target_url'],'scan_count'=>(int)$q['scan_count'],'opts'=>$o,
+    'share_permission'=>$q['share_permission'],'shared_by'=>$q['shared_by']];
 },$qrList))?>;
+var shareRid = 0;
 
 var cur=null, deb=null;
 
@@ -601,6 +635,46 @@ function createQR(){
   closeOv('MN');renderEditor();schedQR();toast('Renseignez l\'URL puis sauvegardez.','info');
 }
 
+// ── SHARE ─────────────────────────────────────────────────────
+function openShare(id){
+  shareRid=id;
+  var sl=document.getElementById('shareList');
+  sl.innerHTML='<div style="font-size:12px;color:var(--dim);text-align:center;padding:10px">Chargement…</div>';
+  openOv('MS');
+  var fd=new FormData();fd.append('csrf_token',CSRF);fd.append('action','list');fd.append('rtype','qr');fd.append('rid',id);
+  fetch('/api/share.php',{method:'POST',body:fd,credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){
+    if(d.ok) renderShareList(d.shares);
+    else sl.innerHTML='<div style="font-size:12px;color:var(--error)">'+esc(d.error||'Erreur')+'</div>';
+  });
+}
+function renderShareList(shares){
+  var el=document.getElementById('shareList');
+  if(!shares||!shares.length){el.innerHTML='<div style="font-size:12px;color:var(--dim);text-align:center;padding:10px">Aucun partage actif</div>';return;}
+  el.innerHTML=shares.map(function(s){
+    return '<div class="share-user-row">'+
+      '<div class="share-user-av">'+esc((s.username||'?').charAt(0).toUpperCase())+'</div>'+
+      '<div class="share-user-info"><div class="share-user-name">'+esc(s.username)+'</div><div class="share-user-email">'+esc(s.email)+'</div></div>'+
+      '<span class="share-perm">'+(s.permission==='edit'?'Peut modifier':'Lecture seule')+'</span>'+
+      '<button class="btn btn-danger btn-icon btn-sm" onclick="removeShare('+s.id+')" title="Retirer"><i class="fa fa-xmark"></i></button>'+
+    '</div>';
+  }).join('');
+}
+function doShare(){
+  var email=document.getElementById('shareEmail').value.trim();
+  var perm=document.getElementById('sharePerm').value;
+  if(!email){toast('Email requis','error');return}
+  var fd=new FormData();fd.append('csrf_token',CSRF);fd.append('action','add');fd.append('rtype','qr');fd.append('rid',shareRid);fd.append('email',email);fd.append('permission',perm);
+  fetch('/api/share.php',{method:'POST',body:fd,credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){
+    if(d.ok){document.getElementById('shareEmail').value='';openShare(shareRid);toast('Partagé avec '+d.user.username,'success');}
+    else toast(d.error||'Erreur','error');
+  });
+}
+function removeShare(shareId){
+  var fd=new FormData();fd.append('csrf_token',CSRF);fd.append('action','remove');fd.append('rtype','qr');fd.append('rid',shareRid);fd.append('share_id',shareId);
+  fetch('/api/share.php',{method:'POST',body:fd,credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){
+    if(d.ok){openShare(shareRid);toast('Accès retiré.','info');}
+  });
+}
 
 </script>
 </body>

@@ -48,12 +48,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     echo json_encode(['ok'=>false,'error'=>'Action inconnue']); exit;
 }
 
-// ── GET : liste ─────────────────────────────────────────────
+// ── GET : liste (propres + partagés avec moi) ────────────────
 $sql = $isAdm
-    ? 'SELECT * FROM email_signatures ORDER BY updated_at DESC'
-    : 'SELECT * FROM email_signatures WHERE user_id=? ORDER BY updated_at DESC';
+    ? 'SELECT *, NULL AS share_permission, NULL AS shared_by FROM email_signatures ORDER BY updated_at DESC'
+    : '(SELECT *, NULL AS share_permission, NULL AS shared_by FROM email_signatures WHERE user_id=?)
+       UNION ALL
+       (SELECT e.*, s.permission AS share_permission, u_o.username AS shared_by
+        FROM email_signatures e
+        JOIN shares s ON s.resource_type=\'sig\' AND s.resource_id=e.id AND s.shared_with=?
+        JOIN users u_o ON u_o.id=e.user_id)
+       ORDER BY updated_at DESC';
 $st = $db->prepare($sql);
-if (!$isAdm) $st->execute([$uid]); else $st->execute();
+if (!$isAdm) $st->execute([$uid, $uid]); else $st->execute();
 $sigList = $st->fetchAll();
 $csrf = getCsrfToken();
 
@@ -141,13 +147,7 @@ $tbActions  = '<button class="btn btn-primary btn-sm" onclick="openOv(\'MN\')"><
 .font-card:hover { border-color: rgba(14,165,233,.5); }
 .font-card.act   { border-color: var(--accent); background: rgba(14,165,233,.1); color: var(--accent); }
 
-/* ── SHARE MODAL ─── */
-.share-user-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: var(--s2); border: 1px solid var(--border); border-radius: 9px; margin-bottom: 6px; }
-.share-user-av  { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0; }
-.share-user-info { flex: 1; min-width: 0; }
-.share-user-name { font-size: 13px; font-weight: 500; }
-.share-user-email { font-size: 11px; color: var(--muted); }
-.share-perm { font-size: 11px; color: var(--accent); background: rgba(14,165,233,.1); padding: 2px 8px; border-radius: 20px; flex-shrink: 0; }
+/* share-user-* styles are in layout.css */
 
 #htmlExport { position:absolute;left:-9999px;top:-9999px;opacity:0; }
 </style>
@@ -171,13 +171,22 @@ $tbActions  = '<button class="btn btn-primary btn-sm" onclick="openOv(\'MN\')"><
         <div class="sb-empty"><i class="fa fa-envelope"></i>Aucune signature.<br>Créez-en une.</div>
       <?php else: foreach ($sigList as $s):
         $d = json_decode($s['data_json'], true) ?: [];
+        $isOwner = ($s['share_permission'] === null);
       ?>
         <div class="sb-item" id="sbi-<?= $s['id'] ?>" onclick="selSig(<?= $s['id'] ?>)">
           <div class="sb-item-name"><?= htmlspecialchars($s['name']) ?></div>
-          <div class="sb-item-sub"><?= htmlspecialchars(trim(($d['firstName']??'').' '.($d['lastName']??''))) ?: 'Sans nom' ?></div>
+          <div class="sb-item-sub">
+            <?php if (!$isOwner): ?>
+              <span class="shared-badge"><i class="fa fa-share-nodes"></i> <?= htmlspecialchars($s['shared_by']) ?></span>
+            <?php else: ?>
+              <?= htmlspecialchars(trim(($d['firstName']??'').' '.($d['lastName']??''))) ?: 'Sans nom' ?>
+            <?php endif; ?>
+          </div>
           <div class="sb-item-actions">
+            <?php if ($isOwner): ?>
             <button class="btn btn-ghost btn-icon btn-sm" onclick="event.stopPropagation();openShare(<?= $s['id'] ?>)" title="Partager"><i class="fa fa-share-nodes" style="color:var(--accent)"></i></button>
             <button class="btn btn-ghost btn-icon btn-sm" onclick="event.stopPropagation();delSig(<?= $s['id'] ?>)" title="Supprimer"><i class="fa fa-trash" style="color:var(--error)"></i></button>
+            <?php endif; ?>
           </div>
         </div>
       <?php endforeach; endif; ?>
@@ -254,7 +263,8 @@ $tbActions  = '<button class="btn btn-primary btn-sm" onclick="openOv(\'MN\')"><
 <script>
 var CSRF = <?=json_encode($csrf)?>;
 var sigData = <?=json_encode(array_map(function($s){
-  return ['id'=>(int)$s['id'],'name'=>$s['name'],'data'=>json_decode($s['data_json'],true)?:[]];
+  return ['id'=>(int)$s['id'],'name'=>$s['name'],'data'=>json_decode($s['data_json'],true)?:[],
+          'share_permission'=>$s['share_permission'],'shared_by'=>$s['shared_by']];
 },$sigList))?>;
 
 var currentSig = null;
@@ -682,13 +692,18 @@ function saveSig(){
 }
 function refreshSBI(s){
   var d=s.data;
+  var isOwner=!s.share_permission;
+  var subHtml=s.shared_by
+    ?'<span class="shared-badge"><i class="fa fa-share-nodes"></i> '+esc(s.shared_by)+'</span>'
+    :esc(trim(((d.firstName||'')+' '+(d.lastName||''))));
+  var actHtml=isOwner
+    ?'<button class="btn btn-ghost btn-icon btn-sm" onclick="event.stopPropagation();openShare('+s.id+')" title="Partager"><i class="fa fa-share-nodes" style="color:var(--accent)"></i></button>'+
+     '<button class="btn btn-ghost btn-icon btn-sm" onclick="event.stopPropagation();delSig('+s.id+')" title="Supprimer"><i class="fa fa-trash" style="color:var(--error)"></i></button>'
+    :'';
   var html='<div class="sb-item'+(currentSig&&currentSig.id===s.id?' active':'')+'\" id="sbi-'+s.id+'" onclick="selSig('+s.id+')">'+
     '<div class="sb-item-name">'+esc(s.name)+'</div>'+
-    '<div class="sb-item-sub">'+esc(trim(((d.firstName||'')+' '+(d.lastName||''))))+'</div>'+
-    '<div class="sb-item-actions">'+
-      '<button class="btn btn-ghost btn-icon btn-sm" onclick="event.stopPropagation();openShare('+s.id+')" title="Partager"><i class="fa fa-share-nodes" style="color:var(--accent)"></i></button>'+
-      '<button class="btn btn-ghost btn-icon btn-sm" onclick="event.stopPropagation();delSig('+s.id+')" title="Supprimer"><i class="fa fa-trash" style="color:var(--error)"></i></button>'+
-    '</div>'+
+    '<div class="sb-item-sub">'+subHtml+'</div>'+
+    '<div class="sb-item-actions">'+actHtml+'</div>'+
   '</div>';
   var ex=document.getElementById('sbi-'+s.id);
   if(ex) ex.outerHTML=html;
