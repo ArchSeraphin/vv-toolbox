@@ -319,8 +319,8 @@ body.nav-mini .nav-toggle-label { opacity: 0; max-width: 0; }
 .btn-save:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(79,110,247,.4); }
 .btn-save.unsaved { background: linear-gradient(135deg,#f59e0b,#d97706); box-shadow: 0 2px 12px rgba(245,158,11,.4); animation: pulse-save 2s infinite; }
 @keyframes pulse-save { 0%,100%{box-shadow:0 2px 12px rgba(245,158,11,.4)} 50%{box-shadow:0 2px 20px rgba(245,158,11,.7)} }
-.unsaved-dot { display:inline-block;width:7px;height:7px;border-radius:50%;background:#fff;margin-right:2px;opacity:0;transition:opacity .2s; }
-.btn-save.unsaved .unsaved-dot { opacity: 1; }
+.unsaved-dot { display:inline-block;width:0;height:7px;border-radius:50%;background:#fff;opacity:0;transition:opacity .2s,width .2s,margin-right .2s; }
+.btn-save.unsaved .unsaved-dot { opacity:1;width:7px;margin-right:2px; }
 .unsaved-label { font-size:11px;color:#f59e0b;font-weight:500;margin-left:2px;opacity:0;transition:opacity .2s;white-space:nowrap; }
 .action-bar.unsaved .unsaved-label { opacity: 1; }
 
