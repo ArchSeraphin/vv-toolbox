@@ -276,6 +276,7 @@ function rED(){
         '<span class="unsaved-dot"></span><i class="fa fa-floppy-disk"></i> <span id="btnSaveLbl">Sauvegarder</span>'+
       '</button>'+
       '<button class="btn btn-ghost btn-sm" onclick="expActive()"><i class="fa fa-download"></i> HTML</button>'+
+      (v.share_permission===null?'<button class="btn btn-ghost btn-sm" onclick="openShare('+v.id+')"><i class="fa fa-share-nodes"></i> Partager</button>':'')+
       '<span class="unsaved-label" id="unsavedLbl">Modifications non sauvegardées</span>'+
       '<div style="flex:1"></div>'+
       '<button class="btn btn-danger btn-sm btn-icon" onclick="delVC('+(v.id||0)+')" title="Supprimer"><i class="fa fa-trash"></i></button>'+

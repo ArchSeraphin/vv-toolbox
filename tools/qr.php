@@ -430,6 +430,7 @@ function renderEditor(){
         '<span class="unsaved-dot"></span><i class="fa fa-floppy-disk"></i> <span id="btnSaveLbl">Sauvegarder</span>'+
       '</button>'+
       '<button class="btn btn-ghost btn-sm" onclick="dlQR(\'png\')"><i class="fa fa-download"></i> PNG</button>'+
+      (q.share_permission===null?'<button class="btn btn-ghost btn-sm" onclick="openShare('+q.id+')"><i class="fa fa-share-nodes"></i> Partager</button>':'')+
       '<span class="unsaved-label" id="unsavedLbl">Modifications non sauvegardées</span>'+
       '<div style="flex:1"></div>'+
       '<button class="btn btn-danger btn-sm btn-icon" onclick="delQR('+q.id+')" title="Supprimer"><i class="fa fa-trash"></i></button>'+
