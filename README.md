@@ -74,7 +74,7 @@
 │
 ├── assets/
 │   ├── layout.css                  ← ⭐ CSS partagé — largeurs fixes, nav, composants
-│   └── layout.js                   ← JS partagé — nav rétractable, thème, toast (optionnel)
+│   └── layout.js                   ← ⭐ JS partagé — nav rétractable, thème, toast, modals
 │
 ├── install/
 │   └── setup.sql                   ← schéma complet + seed admin
@@ -301,13 +301,9 @@ Ne pas redéfinir ces valeurs localement (ou seulement si vraiment nécessaire).
 --nav-w:      240px;   /* nav latérale étendue */
 --nav-w-mini:  56px;   /* nav rétractée (icônes seules) */
 --sb-w:       272px;   /* sidebar liste (gauche) */
---pv-w:       360px;   /* panneau aperçu (droite) */
+--pv-w:       450px;   /* panneau aperçu (droite) */
 --topbar-h:    58px;   /* barre du haut */
 ```
-
-> ⚠️ **Situation actuelle :** `qr.php` et `vcard.php` utilisent encore leurs propres valeurs
-> (`--sb-w:268px`, `--pv-w:340px` / `370px`) définies dans leur `:root` inline.
-> À aligner sur 272px / 360px lors de la prochaine passe de refacto.
 
 ### Palette de couleurs des outils
 
@@ -320,54 +316,56 @@ Ne pas redéfinir ces valeurs localement (ou seulement si vraiment nécessaire).
 ### Thème clair/sombre
 
 Géré via `data-theme="dark|light"` sur `<html>`. Persisté dans `localStorage('vv_theme')`.
-Toujours initialiser en haut de `<script>` (avant le premier rendu) :
+**Fourni automatiquement par `layout.js`** — ne pas redéfinir. Appeler via :
 
-```js
-(function(){
-  var s = localStorage.getItem('vv_theme') || 'dark';
-  document.documentElement.setAttribute('data-theme', s);
-})();
+```html
+<button onclick="toggleTheme()"><i class="fa fa-sun" id="themeIco"></i></button>
 ```
+
+`layout.js` applique le thème immédiatement (synchrone, avant rendu) et met à jour `id="themeIco"`.
 
 ### Nav rétractable
 
 Persistée dans `localStorage('vv_nav')` (`'mini'` ou `'full'`).
 La classe `body.nav-mini` active le mode icônes.
+**Fournie automatiquement par `layout.js`** — ne pas redéfinir. Appeler via :
 
-```js
-// Pattern à copier dans chaque page
-(function(){
-  var m = localStorage.getItem('vv_nav') === 'mini';
-  if (m) document.body.classList.add('nav-mini');
-  function ap(){
-    var i = document.getElementById('navToggleIco');
-    var l = document.getElementById('navToggleLbl');
-    if (i) i.className = document.body.classList.contains('nav-mini') ? 'fa fa-chevron-right' : 'fa fa-chevron-left';
-    if (l) l.textContent = document.body.classList.contains('nav-mini') ? '' : 'Réduire';
-  }
-  ap();
-  window.toggleNav = function(){
-    m = !m;
-    document.body.classList.toggle('nav-mini', m);
-    localStorage.setItem('vv_nav', m ? 'mini' : 'full');
-    ap();
-  };
-})();
+```html
+<button class="nav-toggle" onclick="toggleNav()">
+  <i class="fa fa-chevron-left" id="navToggleIco"></i>
+  <span class="nav-toggle-label" id="navToggleLbl">Réduire</span>
+</button>
 ```
+
+`layout.js` lit `localStorage` au `DOMContentLoaded` et applique l'état initial.
 
 ### Structure HTML d'une page outil (template)
 
+Toujours inclure `layout.css` et `layout.js` (dans cet ordre) :
+
+```html
+<link rel="stylesheet" href="/assets/layout.css">
+<!-- ... styles page-spécifiques ... -->
+
+<!-- En fin de <body> : -->
+<script src="/assets/layout.js"></script>
+```
+
 ```html
 <div class="topbar">
-  <div class="tb-logo">       <!-- largeur = --nav-w, se rétracte avec nav-mini -->
+  <a class="tb-logo" href="/dashboard.php">   <!-- largeur = --nav-w, se rétracte avec nav-mini -->
     <div class="tb-logo-icon"><i class="fa fa-toolbox"></i></div>
     <div class="tb-logo-text">
       <div class="tb-logo-name">VV ToolBox</div>
       <div class="tb-logo-sub">Espace de travail</div>
     </div>
+  </a>
+  <div class="tb-center">
+    <div class="tb-bc"><!-- breadcrumb --></div>
   </div>
-  <div class="tb-center"><!-- breadcrumb ou search --></div>
-  <div class="tb-right"><!-- boutons topbar --></div>
+  <div class="tb-right">
+    <button class="tb-btn" onclick="toggleTheme()"><i class="fa fa-sun" id="themeIco"></i></button>
+  </div>
 </div>
 
 <div class="layout">
@@ -376,14 +374,16 @@ La classe `body.nav-mini` active le mode icônes.
     <div class="nav-body">
       <!-- nav-section > nav-label + nav-item x N -->
       <!-- chaque nav-item doit avoir :
-           - <span class="nav-item-label"> pour le texte (caché en mini)
-           - <span class="nav-tip">Tooltip</span> pour le tooltip mini
+           - <i class="fa ..."></i>
+           - <span class="nav-item-label"> texte (caché en mini)
+           - <span class="nav-badge">N</span> (si compteur)
+           - <span class="nav-tip">Tooltip</span> (affiché en mini)
       -->
     </div>
     <div class="nav-footer">
       <button class="nav-toggle" onclick="toggleNav()">
         <i class="fa fa-chevron-left" id="navToggleIco"></i>
-        <span class="nav-item-label nav-toggle-label" id="navToggleLbl">Réduire</span>
+        <span class="nav-toggle-label" id="navToggleLbl">Réduire</span>
       </button>
     </div>
   </nav>
@@ -417,17 +417,11 @@ La classe `body.nav-mini` active le mode icônes.
 </div>
 ```
 
+`markUnsaved()` et `markSaved()` sont **fournis par `layout.js`**. Les appeler directement :
+
 ```js
-function markUnsaved(){
-  document.getElementById('actionBar')?.classList.add('unsaved');
-  document.getElementById('btnSave')?.classList.add('unsaved');
-}
-function markSaved(){
-  document.getElementById('actionBar')?.classList.remove('unsaved');
-  document.getElementById('btnSave')?.classList.remove('unsaved');
-  var l = document.getElementById('btnSaveLbl');
-  if(l){ l.textContent = 'Sauvegardé ✓'; setTimeout(()=>{ l.textContent='Sauvegarder'; }, 2200); }
-}
+markUnsaved();   // active l'état "non sauvegardé" (bouton orange + animation)
+markSaved();     // remet l'état normal + label "Sauvegardé ✓" temporaire
 ```
 
 ---
@@ -481,15 +475,24 @@ Endpoint POST, 4 actions :
 2. **Créer la table SQL** dans `install/setup.sql` + un fichier `install/migration_vX.sql`
 3. **Ajouter dans la nav** de toutes les pages existantes :
    - `dashboard.php`
-   - `tools/qr.php`
-   - `tools/signature.php`
-   - `tools/vcard.php`
-4. **Ajouter dans `dashboard.php`** :
+   - `tools/qr.php`, `tools/signature.php`, `tools/vcard.php`
+   - `profile.php`, `admin/users.php`
+4. **Ajouter le helper `navCount()`** dans chaque page outil pour afficher les badges :
+   ```php
+   function navCount(PDO $db, string $t, bool $adm, int $uid): int {
+       $s=$db->prepare($adm?"SELECT COUNT(*) FROM $t":"SELECT COUNT(*) FROM $t WHERE user_id=?");
+       $adm?$s->execute():$s->execute([$uid]); return (int)$s->fetchColumn();
+   }
+   $navQr  = navCount($db,'qr_codes',$isAdm,$uid);
+   $navSig = navCount($db,'email_signatures',$isAdm,$uid);
+   $navVc  = navCount($db,'vcards',$isAdm,$uid);
+   ```
+5. **Ajouter dans `dashboard.php`** :
    - La constante `$typeInfo` (icône, label, couleur, url)
    - La requête stats dans `$stats`
    - L'appel `recentItems()` pour l'activité récente
-5. **Respecter les largeurs** (§7 — ne pas toucher `--sb-w`, `--pv-w`, `--nav-w`)
-6. **Copier le pattern nav rétractable** (JS toggleNav + HTML nav-body/nav-footer)
+6. **Respecter les largeurs** (§7 — ne pas toucher `--sb-w`, `--pv-w`, `--nav-w`)
+7. **Inclure `layout.css` + `layout.js`** — ne pas redéfinir thème, nav, toast, modals
 
 ### Snippet PHP de base (haut de fichier)
 
@@ -580,7 +583,6 @@ Voir §8 — Partage entre utilisateurs.
 ## 12. Roadmap & idées
 
 ### En cours / à finir
-- [ ] Aligner `--sb-w` et `--pv-w` dans `qr.php` et `vcard.php` sur les valeurs de `layout.css` (272px / 360px)
 - [ ] Implémenter la lecture des ressources partagées (`api/share.php` action `mine`) dans le dashboard
 - [ ] Protéger `api/share.php` pour les accès `view` vs `edit` côté outils
 
@@ -618,4 +620,4 @@ openssl rand -hex 32
 
 ---
 
-*Dernière mise à jour : v2 — Nav rétractable, partage utilisateurs, layout unifié, signature refactorée*
+*Dernière mise à jour : v1.0.1 — Migration complète vers `layout.css` + `layout.js` (toutes les pages), badges nav sur tous les outils, nav mini centrée, `profile.php` et `admin/users.php` unifiés*

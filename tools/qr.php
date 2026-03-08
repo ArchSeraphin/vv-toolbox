@@ -49,14 +49,13 @@ $sql = $isAdm
 $st = $db->prepare($sql);
 if (!$isAdm) $st->execute([$uid]); else $st->execute();
 $qrList = $st->fetchAll();
-function navCount(PDO $db, string $t, bool $adm, int $uid): int {
-    $s=$db->prepare($adm?"SELECT COUNT(*) FROM $t":"SELECT COUNT(*) FROM $t WHERE user_id=?");
-    $adm?$s->execute():$s->execute([$uid]); return (int)$s->fetchColumn();
-}
-$navQr  = count($qrList);
-$navSig = navCount($db,'email_signatures',$isAdm,$uid);
-$navVc  = navCount($db,'vcards',$isAdm,$uid);
 $csrf = getCsrfToken();
+
+// ── LAYOUT CONFIG ──────────────────────────────────────────
+$navActive  = 'qr';
+$navQr      = count($qrList); // évite une requête supplémentaire
+$breadcrumb = [['QR Code', null]];
+$tbActions  = '<button class="btn btn-primary btn-sm" onclick="openNewModal()"><i class="fa fa-plus"></i> Nouveau QR</button>';
 ?>
 <!DOCTYPE html>
 <html lang="fr" data-theme="dark">
@@ -106,49 +105,11 @@ $csrf = getCsrfToken();
 </head>
 <body>
 
-<div class="topbar">
-  <a class="tb-logo" href="/dashboard.php">
-    <div class="tb-logo-icon"><i class="fa fa-toolbox"></i></div>
-    <div class="tb-logo-text"><div class="tb-logo-name">VV ToolBox</div><div class="tb-logo-sub">Espace de travail</div></div>
-  </a>
-  <div class="tb-center">
-    <div class="tb-bc">
-      <a href="/dashboard.php">Dashboard</a>
-      <span style="color:var(--dim);font-size:10px"><i class="fa fa-chevron-right"></i></span>
-      <span>QR Code</span>
-    </div>
-  </div>
-  <div class="tb-right">
-    <button class="tb-btn" onclick="toggleTheme()"><i class="fa fa-sun" id="themeIco"></i></button>
-    <button class="btn btn-primary btn-sm" onclick="openNewModal()"><i class="fa fa-plus"></i> Nouveau QR</button>
-  </div>
-</div>
+<?php require __DIR__ . '/../includes/topbar.php'; ?>
 
 <div class="layout">
-  <nav class="nav">
-    <div class="nav-body">
-      <div class="nav-section">
-        <div class="nav-label">Navigation</div>
-        <a class="nav-item" href="/dashboard.php"><i class="fa fa-house"></i><span class="nav-item-label"> Dashboard</span><span class="nav-tip">Dashboard</span></a>
-      </div>
-      <div class="nav-section">
-        <div class="nav-label">Outils</div>
-        <a class="nav-item active" href="/tools/qr.php"><i class="fa fa-qrcode"></i><span class="nav-item-label"> QR Code</span><span class="nav-badge"><?=$navQr?></span><span class="nav-tip">QR Code</span></a>
-        <a class="nav-item" href="/tools/signature.php"><i class="fa fa-envelope"></i><span class="nav-item-label"> Signature mail</span><span class="nav-badge"><?=$navSig?></span><span class="nav-tip">Signature mail</span></a>
-        <a class="nav-item" href="/tools/vcard.php"><i class="fa fa-id-card"></i><span class="nav-item-label"> Carte de visite</span><span class="nav-badge"><?=$navVc?></span><span class="nav-tip">Carte de visite</span></a>
-      </div>
-      <div class="nav-sep"></div>
-      <?php if($isAdm):?><a class="nav-item" href="/admin/users.php"><i class="fa fa-users"></i><span class="nav-item-label"> Membres</span><span class="nav-tip">Membres</span></a><?php endif;?>
-      <a class="nav-item" href="/profile.php"><i class="fa fa-user-pen"></i><span class="nav-item-label"> Mon profil</span><span class="nav-tip">Mon profil</span></a>
-      <a class="nav-item" href="/logout.php"><i class="fa fa-arrow-right-from-bracket"></i><span class="nav-item-label"> Déconnexion</span><span class="nav-tip">Déconnexion</span></a>
-    </div>
-    <div class="nav-footer">
-      <button class="nav-toggle" onclick="toggleNav()">
-        <i class="fa fa-chevron-left" id="navToggleIco"></i>
-        <span class="nav-item-label nav-toggle-label" id="navToggleLbl">Réduire</span>
-      </button>
-    </div>
-  </nav>
+
+  <?php require __DIR__ . '/../includes/nav.php'; ?>
 
   <div class="sb">
     <div class="sbh">

@@ -80,6 +80,15 @@ $typeInfo = [
     'sig' => ['icon'=>'fa-envelope',  'label'=>'Signature',  'color'=>'#0ea5e9', 'url'=>'/tools/signature.php'],
     'vc'  => ['icon'=>'fa-id-card',   'label'=>'Carte',      'color'=>'#8b5cf6', 'url'=>'/tools/vcard.php'],
 ];
+
+// ── LAYOUT CONFIG ──────────────────────────────────────────
+$navActive      = 'dashboard';
+$navQr          = $stats['qr'];
+$navSig         = $stats['sig'];
+$navVc          = $stats['vc'];
+$navMemberCount = count($members);
+$breadcrumb     = [];   // vide = affiche la recherche dans la topbar
+$tbActions      = '';
 ?>
 <!DOCTYPE html>
 <html lang="fr" data-theme="dark">
@@ -95,64 +104,12 @@ $typeInfo = [
 <style>
 /* ── PAGE Dashboard : surcharges spécifiques ─── */
 :root {
-  --qr:       #4f6ef7;
-  --sig:      #0ea5e9;
-  --vc:       #8b5cf6;
-  --warn:     #fbbf24;
-  --danger:   #f87171;
+  --warn:   #fbbf24;
+  --danger: #f87171;
 }
 
-/* Search in topbar */
+/* Search padding override */
 .tb-center { padding: 0 24px; }
-.tb-search {
-  display: flex; align-items: center; gap: 9px;
-  background: var(--s2); border: 1px solid var(--border);
-  border-radius: 9px; padding: 8px 14px;
-  width: 100%; max-width: 360px;
-  transition: border-color .15s, box-shadow .15s;
-}
-.tb-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb,var(--accent) 10%,transparent); }
-.tb-search i { color: var(--dim); font-size: 12px; flex-shrink: 0; }
-.tb-search input { border: none; background: transparent; color: var(--text); font-family: 'Geist', sans-serif; font-size: 13px; outline: none; flex: 1; }
-.tb-search input::placeholder { color: var(--dim); }
-
-/* Avatar */
-.avatar {
-  width: 34px; height: 34px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), #7c5cfc);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 600; color: #fff;
-  cursor: pointer; flex-shrink: 0;
-  border: 2px solid transparent; transition: border-color .15s;
-  position: relative;
-}
-.avatar:hover { border-color: var(--accent); }
-.av-dropdown {
-  position: absolute; top: calc(100% + 8px); right: 0;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 12px; padding: 6px; min-width: 200px;
-  box-shadow: 0 16px 40px rgba(0,0,0,.4);
-  display: none; z-index: 200;
-  animation: fadeDown .2s cubic-bezier(.16,1,.3,1) both;
-}
-@keyframes fadeDown { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
-.av-dropdown.open { display: block; }
-.av-head { padding: 10px 12px 8px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
-.av-name { font-weight: 600; font-size: 13px; }
-.av-email { font-size: 11px; color: var(--muted); margin-top: 1px; }
-.av-role { display: inline-flex; align-items: center; gap: 4px; margin-top: 5px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; padding: 2px 7px; border-radius: 20px; }
-.av-role.admin  { background: color-mix(in srgb,var(--accent) 15%,transparent); color: var(--accent); }
-.av-role.member { background: color-mix(in srgb,var(--sig) 12%,transparent); color: var(--sig); }
-.av-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--muted); text-decoration: none; transition: all .12s; }
-.av-item:hover { background: var(--s2); color: var(--text); }
-.av-item.danger:hover { background: rgba(248,113,113,.08); color: var(--danger); }
-.av-item i { width: 16px; text-align: center; font-size: 13px; }
-
-/* Nav tool-specific active states */
-.nav-item.tool-qr.active  { background: color-mix(in srgb,var(--qr) 10%,transparent);  border-color: color-mix(in srgb,var(--qr) 20%,transparent);  color: var(--qr); }
-.nav-item.tool-sig.active { background: color-mix(in srgb,var(--sig) 10%,transparent); border-color: color-mix(in srgb,var(--sig) 20%,transparent); color: var(--sig); }
-.nav-item.tool-vc.active  { background: color-mix(in srgb,var(--vc) 10%,transparent);  border-color: color-mix(in srgb,var(--vc) 20%,transparent);  color: var(--vc); }
-.nav-item.active .nav-badge { background: color-mix(in srgb,var(--accent) 20%,transparent); color: var(--accent); }
 
 /* Main content */
 .main { flex: 1; overflow-y: auto; padding: 28px 32px 40px; display: flex; flex-direction: column; gap: 28px; }
@@ -248,112 +205,11 @@ tbody td { padding: 13px 16px; font-size: 13px; }
 </head>
 <body>
 
-<!-- ── TOPBAR ── -->
-<div class="topbar">
-  <div class="tb-logo">
-    <div class="tb-logo-icon" aria-hidden="true"><i class="fa fa-toolbox"></i></div>
-    <div class="tb-logo-text">
-      <div class="tb-logo-name">VV ToolBox</div>
-      <div class="tb-logo-sub">Espace de travail</div>
-    </div>
-  </div>
-  <div class="tb-center">
-    <div class="tb-search">
-      <i class="fa fa-magnifying-glass"></i>
-      <input type="text" placeholder="Rechercher une création…" id="searchInput" autocomplete="off">
-    </div>
-  </div>
-  <div class="tb-right">
-    <button class="tb-btn" onclick="toggleTheme()" title="Thème" aria-label="Changer le thème">
-      <i class="fa fa-sun" id="themeIco"></i>
-    </button>
-    <div class="avatar" id="avatarBtn" title="Mon compte" role="button" tabindex="0"
-         aria-haspopup="true" aria-expanded="false">
-      <?= strtoupper(mb_substr($user['username'], 0, 1)) ?>
-      <div class="av-dropdown" id="avMenu" role="menu">
-        <div class="av-head">
-          <div class="av-name"><?= htmlspecialchars($user['username']) ?></div>
-          <div class="av-email"><?= htmlspecialchars($user['email']) ?></div>
-          <span class="av-role <?= $user['role'] ?>">
-            <i class="fa <?= $isAdm ? 'fa-shield-halved' : 'fa-user' ?>"></i>
-            <?= $user['role'] === 'admin' ? 'Administrateur' : 'Membre' ?>
-          </span>
-        </div>
-        <?php if ($isAdm): ?>
-        <a class="av-item" href="/admin/users.php"><i class="fa fa-users"></i> Gestion membres</a>
-        <a class="av-item" href="/admin/settings.php"><i class="fa fa-gear"></i> Paramètres</a>
-        <?php endif; ?>
-        <a class="av-item" href="/profile.php"><i class="fa fa-user-pen"></i> Mon profil</a>
-        <div style="height:1px;background:var(--border);margin:4px 0"></div>
-        <a class="av-item danger" href="/logout.php"><i class="fa fa-arrow-right-from-bracket"></i> Déconnexion</a>
-      </div>
-    </div>
-  </div>
-</div>
+<?php require __DIR__ . '/includes/topbar.php'; ?>
 
-<!-- ── LAYOUT ── -->
 <div class="layout">
 
-  <!-- Sidebar nav -->
-  <nav class="nav" aria-label="Navigation principale">
-    <div class="nav-body">
-      <div class="nav-section">
-        <div class="nav-label">Navigation</div>
-        <a class="nav-item active" href="/dashboard.php" data-tip="Dashboard">
-          <i class="fa fa-house"></i><span class="nav-item-label"> Dashboard</span>
-          <span class="nav-tip">Dashboard</span>
-        </a>
-      </div>
-
-      <div class="nav-section">
-        <div class="nav-label">Outils</div>
-        <a class="nav-item tool-qr" href="/tools/qr.php" data-tip="QR Code">
-          <i class="fa fa-qrcode"></i><span class="nav-item-label"> QR Code</span>
-          <span class="nav-badge"><?= $stats['qr'] ?></span>
-          <span class="nav-tip">QR Code</span>
-        </a>
-        <a class="nav-item tool-sig" href="/tools/signature.php" data-tip="Signature mail">
-          <i class="fa fa-envelope"></i><span class="nav-item-label"> Signature mail</span>
-          <span class="nav-badge"><?= $stats['sig'] ?></span>
-          <span class="nav-tip">Signature mail</span>
-        </a>
-        <a class="nav-item tool-vc" href="/tools/vcard.php" data-tip="Carte de visite">
-          <i class="fa fa-id-card"></i><span class="nav-item-label"> Carte de visite</span>
-          <span class="nav-badge"><?= $stats['vc'] ?></span>
-          <span class="nav-tip">Carte de visite</span>
-        </a>
-      </div>
-
-      <?php if ($isAdm): ?>
-      <div class="nav-sep"></div>
-      <div class="nav-section">
-        <div class="nav-label">Administration</div>
-        <a class="nav-item" href="/admin/users.php" data-tip="Membres">
-          <i class="fa fa-users"></i><span class="nav-item-label"> Membres</span>
-          <span class="nav-badge"><?= count($members) ?></span>
-          <span class="nav-tip">Membres</span>
-        </a>
-      </div>
-      <?php endif; ?>
-
-      <div class="nav-sep"></div>
-      <a class="nav-item" href="/profile.php" data-tip="Mon profil">
-        <i class="fa fa-user-pen"></i><span class="nav-item-label"> Mon profil</span>
-        <span class="nav-tip">Mon profil</span>
-      </a>
-      <a class="nav-item" href="/logout.php" data-tip="Déconnexion">
-        <i class="fa fa-arrow-right-from-bracket"></i><span class="nav-item-label"> Déconnexion</span>
-        <span class="nav-tip">Déconnexion</span>
-      </a>
-    </div><!-- nav-body -->
-
-    <div class="nav-footer">
-      <button class="nav-toggle" onclick="toggleNav()">
-        <i class="fa fa-chevron-left" id="navToggleIco"></i>
-        <span class="nav-item-label nav-toggle-label" id="navToggleLbl">Réduire</span>
-      </button>
-    </div>
-  </nav>
+  <?php require __DIR__ . '/includes/nav.php'; ?>
 
   <!-- Main -->
   <main class="main" id="mainContent">
@@ -554,22 +410,6 @@ tbody td { padding: 13px 16px; font-size: 13px; }
 
 <script src="/assets/layout.js"></script>
 <script>
-// ── AVATAR DROPDOWN ───────────────────────────────────────
-var avBtn = document.getElementById('avatarBtn');
-var avMenu = document.getElementById('avMenu');
-avBtn.addEventListener('click', function(e) {
-  e.stopPropagation();
-  var open = avMenu.classList.toggle('open');
-  avBtn.setAttribute('aria-expanded', open);
-});
-document.addEventListener('click', function() {
-  avMenu.classList.remove('open');
-  avBtn.setAttribute('aria-expanded', false);
-});
-avBtn.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); avBtn.click(); }
-});
-
 // ── SEARCH ────────────────────────────────────────────────
 document.getElementById('searchInput').addEventListener('input', function() {
   var q = this.value.toLowerCase().trim();

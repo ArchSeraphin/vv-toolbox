@@ -48,6 +48,24 @@
         if (e.target === el) el.classList.remove('open');
       });
     });
+
+    /* ── AVATAR DROPDOWN ──────────────────────────────────── */
+    var avBtn  = document.getElementById('avatarBtn');
+    var avMenu = document.getElementById('avMenu');
+    if (avBtn && avMenu) {
+      avBtn.addEventListener('click', function(e){
+        e.stopPropagation();
+        var open = avMenu.classList.toggle('open');
+        avBtn.setAttribute('aria-expanded', open);
+      });
+      document.addEventListener('click', function(){
+        avMenu.classList.remove('open');
+        avBtn.setAttribute('aria-expanded', 'false');
+      });
+      avBtn.addEventListener('keydown', function(e){
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); avBtn.click(); }
+      });
+    }
   });
 
   /* ── TOAST ─────────────────────────────────────────────── */
