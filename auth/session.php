@@ -104,6 +104,11 @@ function recordLoginAttempt(string $ip, string $email, bool $success): void {
     $db->prepare(
         'INSERT INTO login_attempts (ip_address, email, success) VALUES (?, ?, ?)'
     )->execute([$ip, $email, $success ? 1 : 0]);
+
+    // Purge des entrées de plus de 30 jours (nettoyage opportuniste, ~5% des appels)
+    if (random_int(1, 20) === 1) {
+        $db->exec("DELETE FROM login_attempts WHERE attempted_at < DATE_SUB(NOW(), INTERVAL 30 DAY)");
+    }
 }
 
 // ----------------------------------------------------------

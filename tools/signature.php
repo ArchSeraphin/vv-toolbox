@@ -67,7 +67,7 @@ $csrf = getCsrfToken();
 $navActive  = 'sig';
 $navSig     = count($sigList);
 $breadcrumb = [['Signature mail', null]];
-$tbActions  = '<button class="btn btn-primary btn-sm" onclick="openOv(\'MN\')"><i class="fa fa-plus"></i> Nouvelle</button>';
+$tbActions  = '<button class="btn btn-primary btn-sm" onclick="openOv(\'MN\')"><i class="fa fa-plus"></i> Nouvelle Signature</button>';
 ?>
 <!DOCTYPE html>
 <html lang="fr" data-theme="dark">
