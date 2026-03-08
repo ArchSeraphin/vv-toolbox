@@ -26,6 +26,7 @@ if (!function_exists('_navCount')) {
     }
 }
 
+$isAdm = $isAdm ?? isAdmin();
 $_uid = (int)$user['id'];
 if (!isset($navQr))  $navQr  = _navCount($db, 'qr_codes',        $isAdm, $_uid);
 if (!isset($navSig)) $navSig = _navCount($db, 'email_signatures', $isAdm, $_uid);
