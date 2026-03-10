@@ -29,13 +29,13 @@ if (!$slug || !preg_match('/^[a-z0-9\-]+$/', $slug)) {
 
 try {
     $db = getDB();
-    $st = $db->prepare('SELECT id, target_url, is_active FROM qr_codes WHERE slug = ? LIMIT 1');
+    $st = $db->prepare('SELECT id, target_url FROM qr_codes WHERE slug = ? LIMIT 1');
     $st->execute([$slug]);
     $qr = $st->fetch();
 
-    if (!$qr || !$qr['is_active']) {
+    if (!$qr) {
         http_response_code(404);
-        die('Ce QR Code n\'existe plus ou a été désactivé.');
+        die('Ce QR Code est introuvable.');
     }
 
     // Incrémenter le compteur de scans (fire & forget)

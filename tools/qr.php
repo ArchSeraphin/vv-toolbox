@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $db->prepare('UPDATE qr_codes SET name=?,slug=?,target_url=?,options_json=?,updated_at=NOW() WHERE id=? AND user_id=?')->execute([$name,$slug,$url,$opts,$id,$uid]);
                 echo json_encode(['ok'=>true,'id'=>$id]);
             } else {
-                $db->prepare('INSERT INTO qr_codes (user_id,name,slug,target_url,options_json) VALUES (?,?,?,?,?)')->execute([$uid,$name,$slug,$url,$opts]);
+                $db->prepare('INSERT INTO qr_codes (user_id,name,slug,target_url,options_json,is_active) VALUES (?,?,?,?,?,1)')->execute([$uid,$name,$slug,$url,$opts]);
                 echo json_encode(['ok'=>true,'id'=>$db->lastInsertId()]);
             }
         } catch (PDOException $e) { echo json_encode(['ok'=>false,'error'=>'Slug déjà utilisé']); }
@@ -85,10 +85,6 @@ $tbActions  = '<button class="btn btn-primary btn-sm" onclick="openNewModal()"><
 .dot-opt.act{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);color:var(--accent)}
 .dot-preview{width:38px;height:38px;border-radius:4px}
 
-.eye-row{display:flex;gap:8px}
-.eye-opt{flex:1;padding:8px;border-radius:9px;border:1px solid var(--border);background:var(--s2);cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);transition:all .15s;text-align:center}
-.eye-opt:hover{border-color:color-mix(in srgb,var(--accent) 50%,transparent)}
-.eye-opt.act{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);color:var(--accent)}
 
 .pv{width:var(--pv-w);background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:20px 16px;flex-shrink:0;overflow-y:auto;gap:0;min-height:0}
 .pv::-webkit-scrollbar{width:3px}.pv::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
@@ -310,39 +306,58 @@ function drawQR(text,opts,canvas){
   function drawEye(r0,c0){
     var ex=margin+c0*cellSz, ey=margin+r0*cellSz;
     var ew=7*cellSz;
-    var rad=eye==='rounded'?ew*0.15:0;
+    var cx=ex+ew/2, cy=ey+ew/2;
 
     /* clear area */
     if(trans) ctx.clearRect(ex,ey,ew,ew);
     else{ctx.fillStyle=bg;ctx.fillRect(ex,ey,ew,ew);}
 
-    /* outer ring */
     ctx.fillStyle=fg;
-    if(rad>0) roundRect(ctx,ex,ey,ew,ew,rad);
-    else ctx.fillRect(ex,ey,ew,ew);
-
-    /* inner white square */
-    var irad=eye==='rounded'?cellSz*0.3:0;
-    if(trans) ctx.clearRect(ex+cellSz,ey+cellSz,5*cellSz,5*cellSz);
-    else{ctx.fillStyle=bg; if(irad>0) roundRect(ctx,ex+cellSz,ey+cellSz,5*cellSz,5*cellSz,irad); else ctx.fillRect(ex+cellSz,ey+cellSz,5*cellSz,5*cellSz);}
-
-    /* inner dot 3×3 */
-    ctx.fillStyle=fg;
-    var drad=eye==='rounded'?cellSz*0.25:0;
-    if(drad>0) roundRect(ctx,ex+2*cellSz,ey+2*cellSz,3*cellSz,3*cellSz,drad);
-    else ctx.fillRect(ex+2*cellSz,ey+2*cellSz,3*cellSz,3*cellSz);
+    if(eye==='dot'){
+      /* outer circle */
+      ctx.beginPath();ctx.arc(cx,cy,ew/2,0,Math.PI*2);ctx.fill();
+      /* inner white circle */
+      if(trans){
+        ctx.save();ctx.globalCompositeOperation='destination-out';
+        ctx.beginPath();ctx.arc(cx,cy,ew/2-cellSz,0,Math.PI*2);ctx.fill();
+        ctx.restore();
+      } else {
+        ctx.fillStyle=bg;ctx.beginPath();ctx.arc(cx,cy,ew/2-cellSz,0,Math.PI*2);ctx.fill();
+      }
+      /* inner dot circle */
+      ctx.fillStyle=fg;ctx.beginPath();ctx.arc(cx,cy,1.5*cellSz,0,Math.PI*2);ctx.fill();
+    } else {
+      var rad=eye==='rounded'?ew*0.25:0;
+      var irad=eye==='rounded'?cellSz*0.5:0;
+      var drad=eye==='rounded'?cellSz*0.4:0;
+      /* outer */
+      if(rad>0) roundRect(ctx,ex,ey,ew,ew,rad);
+      else ctx.fillRect(ex,ey,ew,ew);
+      /* inner white */
+      if(trans) ctx.clearRect(ex+cellSz,ey+cellSz,5*cellSz,5*cellSz);
+      else{ctx.fillStyle=bg;if(irad>0) roundRect(ctx,ex+cellSz,ey+cellSz,5*cellSz,5*cellSz,irad); else ctx.fillRect(ex+cellSz,ey+cellSz,5*cellSz,5*cellSz);}
+      /* inner dot */
+      ctx.fillStyle=fg;
+      if(drad>0) roundRect(ctx,ex+2*cellSz,ey+2*cellSz,3*cellSz,3*cellSz,drad);
+      else ctx.fillRect(ex+2*cellSz,ey+2*cellSz,3*cellSz,3*cellSz);
+    }
   }
 
   drawEye(0,0); drawEye(0,N-7); drawEye(N-7,0);
 
-  /* logo overlay */
+  /* logo overlay — aspect ratio préservé */
   if(opts.logoData){
     var img=new Image();
     img.onload=function(){
       var lp=(opts.logoSize||30)/100;
-      var lw=SIZE*lp,lh=SIZE*lp,lx=(SIZE-lw)/2,ly=(SIZE-lh)/2;
-      if(trans) ctx.clearRect(lx-4,ly-4,lw+8,lh+8);
-      else{ctx.fillStyle=bg;ctx.fillRect(lx-4,ly-4,lw+8,lh+8);}
+      var maxSz=SIZE*lp;
+      var ratio=img.naturalWidth/img.naturalHeight;
+      var lw=ratio>=1?maxSz:maxSz*ratio;
+      var lh=ratio>=1?maxSz/ratio:maxSz;
+      var lx=(SIZE-lw)/2,ly=(SIZE-lh)/2;
+      var pad=5;
+      if(trans) ctx.clearRect(lx-pad,ly-pad,lw+pad*2,lh+pad*2);
+      else{ctx.fillStyle=bg;ctx.fillRect(lx-pad,ly-pad,lw+pad*2,lh+pad*2);}
       ctx.drawImage(img,lx,ly,lw,lh);
     };
     img.src=opts.logoData;
@@ -411,6 +426,11 @@ var DOT_STYLES=[
   {k:'extra-rounded',l:'Bulles'},
   {k:'classy',l:'Diamant'},
 ];
+var EYE_STYLES=[
+  {k:'square',l:'Carré'},
+  {k:'rounded',l:'Arrondi'},
+  {k:'dot',l:'Cercle'},
+];
 
 function renderEditor(){
   var q=cur;if(!q)return;
@@ -458,10 +478,10 @@ function renderEditor(){
     mkSec('fa-shapes','Style des modules',true,
       '<div class="dot-grid" id="dotGrid">'+dotBtns+'</div>'+
       '<div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:10px 0 6px">Coins (yeux)</div>'+
-      '<div class="eye-row">'+
-        ['square','rounded'].map(function(e){
-          var lbl=e==='square'?'Carré':'Arrondi';
-          return '<div class="eye-opt'+(eye===e?' act':'')+'" onclick="setEye(\''+e+'\')">'+lbl+'</div>';
+      '<div class="dot-grid" id="eyeGrid">'+
+        EYE_STYLES.map(function(e){
+          return '<div class="dot-opt'+(eye===e.k?' act':'')+'" data-eye="'+e.k+'" onclick="setEye(\''+e.k+'\')">'+
+            '<canvas class="dot-preview" id="ep_'+e.k+'"></canvas>'+e.l+'</div>';
         }).join('')+
       '</div>'
     )+
@@ -483,7 +503,7 @@ function renderEditor(){
     )+'</div>'; /* close content wrapper */
 
   toggleBgField(trans);
-  setTimeout(drawPreviews,40);
+  setTimeout(function(){drawPreviews();drawEyePreviews();},40);
 }
 
 
@@ -536,6 +556,47 @@ function drawPreviews(){
   });
 }
 
+/* Draw tiny eye-style previews */
+function drawEyePreviews(){
+  var fg=(cur&&cur.opts&&cur.opts.fgColor)||'#4f6ef7';
+  var bg='#ffffff';
+  EYE_STYLES.forEach(function(e){
+    var c=document.getElementById('ep_'+e.k);if(!c)return;
+    c.width=38;c.height=38;
+    var ctx=c.getContext('2d');
+    var sz=28,ox=5,oy=5; // eye area 28×28px at offset 5,5
+    var cell=sz/7;
+    var cx=ox+sz/2,cy=oy+sz/2;
+    ctx.clearRect(0,0,38,38);
+    ctx.fillStyle=fg;
+    if(e.k==='dot'){
+      ctx.beginPath();ctx.arc(cx,cy,sz/2,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle=bg;ctx.beginPath();ctx.arc(cx,cy,sz/2-cell,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle=fg;ctx.beginPath();ctx.arc(cx,cy,1.5*cell,0,Math.PI*2);ctx.fill();
+    } else {
+      var r=e.k==='rounded'?sz*0.25:0;
+      var ir=e.k==='rounded'?cell*0.5:0;
+      var dr=e.k==='rounded'?cell*0.4:0;
+      /* outer */
+      if(r>0){ctx.beginPath();drawRR(ctx,ox,oy,sz,sz,r);ctx.fill();}else ctx.fillRect(ox,oy,sz,sz);
+      /* inner white */
+      ctx.fillStyle=bg;
+      if(ir>0){ctx.beginPath();drawRR(ctx,ox+cell,oy+cell,5*cell,5*cell,ir);ctx.fill();}else ctx.fillRect(ox+cell,oy+cell,5*cell,5*cell);
+      /* inner dot */
+      ctx.fillStyle=fg;
+      if(dr>0){ctx.beginPath();drawRR(ctx,ox+2*cell,oy+2*cell,3*cell,3*cell,dr);ctx.fill();}else ctx.fillRect(ox+2*cell,oy+2*cell,3*cell,3*cell);
+    }
+  });
+  function drawRR(ctx,x,y,w,h,r){
+    r=Math.min(r,w/2,h/2);
+    ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);
+    ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
+    ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);
+    ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);
+    ctx.closePath();
+  }
+}
+
 /* ── UPDATE HELPERS ─────────────────────────────────────── */
 function upd(k,v){if(!cur)return;cur[k]=v;markUnsaved()}
 function setOpt(k,v){if(!cur)return;if(!cur.opts)cur.opts={};cur.opts[k]=v;markUnsaved()}
@@ -544,7 +605,7 @@ function updColor(k,v){
   var sw=document.getElementById('sw_'+k),hx=document.getElementById('hx_'+k);
   if(sw){sw.style.background=v;sw.classList.remove('checker')}
   if(hx)hx.value=v;
-  drawPreviews();schedQR();
+  drawPreviews();drawEyePreviews();schedQR();
 }
 function updColorHx(k,v){if(!/^#[0-9a-fA-F]{6}$/.test(v))return;updColor(k,v)}
 function setDot(s){
@@ -553,7 +614,7 @@ function setDot(s){
 }
 function setEye(s){
   setOpt('eyeStyle',s);schedQR();
-  document.querySelectorAll('.eye-opt').forEach(function(el,i){el.classList.toggle('act',(i===0&&s==='square')||(i===1&&s==='rounded'))});
+  document.querySelectorAll('#eyeGrid .dot-opt').forEach(function(el){el.classList.toggle('act',el.dataset.eye===s)});
 }
 function upLogo(ev){
   var f=ev.target.files[0];if(!f)return;
