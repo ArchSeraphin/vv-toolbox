@@ -345,13 +345,16 @@ function drawQR(text,opts,canvas){
 
   drawEye(0,0); drawEye(0,N-7); drawEye(N-7,0);
 
-  /* logo overlay — aspect ratio préservé */
+  /* logo overlay — aspect ratio préservé (dimensions lues à l'upload) */
   if(opts.logoData){
     var img=new Image();
     img.onload=function(){
       var lp=(opts.logoSize||30)/100;
       var maxSz=SIZE*lp;
-      var ratio=img.naturalWidth/img.naturalHeight;
+      /* Utilise les dimensions stockées à l'upload; fallback sur naturalWidth */
+      var nw=opts.logoW||img.naturalWidth||img.width||1;
+      var nh=opts.logoH||img.naturalHeight||img.height||1;
+      var ratio=nw/nh;
       var lw=ratio>=1?maxSz:maxSz*ratio;
       var lh=ratio>=1?maxSz/ratio:maxSz;
       var lx=(SIZE-lw)/2,ly=(SIZE-lh)/2;
@@ -618,7 +621,19 @@ function setEye(s){
 }
 function upLogo(ev){
   var f=ev.target.files[0];if(!f)return;
-  var r=new FileReader();r.onload=function(e){setOpt('logoData',e.target.result);renderEditor();schedQR()};r.readAsDataURL(f);
+  var r=new FileReader();
+  r.onload=function(e){
+    var dataUrl=e.target.result;
+    var tmp=new Image();
+    tmp.onload=function(){
+      setOpt('logoData',dataUrl);
+      setOpt('logoW',tmp.naturalWidth||tmp.width||0);
+      setOpt('logoH',tmp.naturalHeight||tmp.height||0);
+      renderEditor();schedQR();
+    };
+    tmp.src=dataUrl;
+  };
+  r.readAsDataURL(f);
 }
 
 /* ── SELECT ─────────────────────────────────────────────── */
